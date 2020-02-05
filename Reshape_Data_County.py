@@ -11,14 +11,13 @@ import pandas as pd
 import re
 
 os.chdir(r'H:\21\21659 - E03983 - PennDOT BOMO Safety\WO8 - HSIP Implementation Plan\task 2.1\annual crashes\Crash Analsys - Apoorba\RawData')
-
-
+os.chdir(r'C:\Users\abibeka\OneDrive - Kittelson & Associates, Inc\Documents\HSIP\Crash Analsys - Apoorba\RawData')
+os.getcwd()
 Wb_Name = 'Crash_Statistics'
-Wb_Name = 'Fatality_Statistics'
-Wb_Name = 'Suspected_Serious_Injury_Statistics'
+# Wb_Name = 'Fatality_Statistics'
+# Wb_Name = 'Suspected_Serious_Injury_Statistics'
 
 x1 = pd.ExcelFile(Wb_Name+'.xlsx')
-x1.sheet_names
 
 x2 = pd.ExcelFile('Name-KeyMap.xlsx')
 NmKeys = x2.parse()
@@ -54,6 +53,7 @@ for ShNm in x1.sheet_names:
         AllCountyDatDict[CountyNm] = tempDat
         FinalDat  = pd.concat([FinalDat,tempDat])
         
+FinalDat.CrashCategory.value_counts()
 #**********************************************************************************
 #**********************************************************************************
 
@@ -104,7 +104,7 @@ FinalDat.loc[:,'CountyNm']= FinalDat.loc[:,'CountyNm'].str.capitalize().str.stri
 FinalDat.loc[:,'CountyNm'] = FinalDat.loc[:,'CountyNm'].str.replace('Huntington','Huntingdon')
 FinalDat =FinalDat.merge(DistrictKeys,left_on='CountyNm',right_on = 'CountyNm', how = 'left')
 
-sum(FinalDat.DistrictA.isna())
+sum(FinalDat.District.isna())
 GpBy = FinalDat.groupby('CrashCategory')  
 outFi = Wb_Name+ "_Processed.xlsx"
 writer=pd.ExcelWriter(outFi)
