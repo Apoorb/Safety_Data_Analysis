@@ -14,7 +14,7 @@ os.chdir(r'H:\21\21659 - E03983 - PennDOT BOMO Safety\WO8 - HSIP Implementation 
 os.chdir(r'C:\Users\abibeka\OneDrive - Kittelson & Associates, Inc\Documents\HSIP\Crash Analsys - Apoorba\RawData')
 os.getcwd()
 Wb_Name = 'Crash_Statistics'
-# Wb_Name = 'Fatality_Statistics'
+Wb_Name = 'Fatality_Statistics'
 # Wb_Name = 'Suspected_Serious_Injury_Statistics'
 
 x1 = pd.ExcelFile(Wb_Name+'.xlsx')
