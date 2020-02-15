@@ -5,6 +5,11 @@ Created on Thu Feb 13 10:55:08 2020
 @author: abibeka
 """
 
+#0.0 Housekeeping. Clear variable space
+from IPython import get_ipython  #run magic commands
+ipython = get_ipython()
+ipython.magic("reset -f")
+ipython = get_ipython()
 
 # Load Libraries
 #************************************************************************************************************
@@ -13,6 +18,8 @@ import os
 import geopandas as gpd
 import pandasql as ps
 import numpy as np
+import xlsxwriter
+
 os.chdir(r'C:\Users\abibeka\OneDrive - Kittelson & Associates, Inc\Documents\HSIP\DataMapping')
 
 # Read the Data
@@ -20,8 +27,10 @@ os.chdir(r'C:\Users\abibeka\OneDrive - Kittelson & Associates, Inc\Documents\HSI
 # Get the Project and Seg data...
 x1 = pd.ExcelFile("2019 HSIP Program Benefit Cost Analysis 5 Year - Kittelson Master - v1.xlsx")
 Years = x1.sheet_names
-writer = pd.ExcelWriter('Text.xlsx')
+writer = pd.ExcelWriter('DataSummary.xlsx')
 Years.remove('Summary (Injuries)'); Years.remove('Summary (Crashes)');Years.remove('Long Narrative');Years.remove('Functional Classifications')
+yr = "2002-2007"
+NumProjDat = pd.DataFrame()
 for yr in Years:
     Data = x1.parse(yr,skiprows=4)
     #Fix 2002-2007
@@ -30,13 +39,18 @@ for yr in Years:
         ColRename = Data.columns[[Cols.index("From"),Cols.index("From")+1,Cols.index("To"), Cols.index("To")+1]]
         ColRenameDict = dict(zip(ColRename, ["Beg Seg","Beg Off","End Seg","End Off"])) 
         Data = Data.rename(columns = ColRenameDict)
-        
-
-    
+        Data = Data.drop(0,axis=0)
+        Data["Beg Seg"] =Data["Beg Seg"].astype("int64");Data["Beg Off"] = Data["Beg Off"].astype("int64");Data["End Seg"] = Data["End Seg"].astype("int64");Data["End Off"] = Data["End Off"].astype("int64")
+              
     Data = Data[['Proj. ID','County','SR','Beg Seg','Beg Off', 'End Seg','End Off']]
     Data1 = Data.fillna(method='ffill',axis= 0 )
     Data1.loc[:,"County"] = Data1.loc[:,"County"].str.upper()
-    
+    if yr == "2002-2007":
+        Data1.dtypes
+        Data1.SR.value_counts()
+        Data1.SR = Data1.SR.astype('int64')
+        Data1.loc[Data1["Proj. ID"] == "80076\n80077","Proj. ID"] = "80076"
+        Data1["Proj. ID"] = Data1["Proj. ID"].astype('int64')
     # Get County name and code from shapefile
     # Read the County and District Shape Files
     Countyshapefile = 'PennDOT-CountyDistrictShp/County_Boundary.shp'
@@ -53,7 +67,10 @@ for yr in Years:
                                     "Beg Off":"BegOff",
                                     "End Seg":"EndSeg",
                                     "End Off":"EndOff"})
-    
+
+    #Num Project summary
+    temp1 = pd.DataFrame({"Year":[yr], "NumProjects":[Data1.ProjID.unique().shape[0]] } )
+    NumProjDat = pd.concat([temp1, NumProjDat])
     # Get the lookup data for Segment length and AADT
     SegInfoData = pd.read_csv("RMSSEG_State_Roads.csv", 
                               usecols = ["CTY_CODE","ST_RT_NO","SEG_NO","SEG_LNGTH_FEET","CUR_AADT"])
@@ -108,6 +125,7 @@ for yr in Years:
                 #raise AssertionError("Something is wrong")
         return(SegLength)
     
+
     #Compute length of the segments 
     #************************************************************************************************************
     NewDf.loc[:,'CorSegLen'] = NewDf.apply(CalcSegDist, axis=1)
@@ -118,14 +136,41 @@ for yr in Years:
     Mask = ((NewDf.BegSeg %2 == 0) & (NewDf.SegNo %2 == 0)) |((NewDf.BegSeg %2 != 0) & (NewDf.SegNo %2 != 0))  
     NewDfClean = NewDf[Mask]
     NewDfClean = NewDfClean.groupby(['ProjID','CountyCode','SR','BegSeg','BegOff']).agg({'CorSegLen':'sum','CurAADT':'first'}).reset_index()
-    
+    NewDfClean.dtypes
+    Data1.dtypes
     
     CmList = ['ProjID','CountyCode','SR','BegSeg','BegOff']
     FinDat = pd.merge(Data1, NewDfClean, left_on = CmList, right_on = CmList, how = 'left')
-    FinDat1 = FinDat.set_index(['ProjID','County','CountyCode','SR','BegSeg','BegOff'])
+    FinDat1 = FinDat.set_index(['ProjID','County','CountyCode','SR','BegSeg','BegOff','EndSeg','EndOff'])
     
     #Write the output
     #***********************************************************************************************************
-    FinDat1.to_excel(writer,yr)
+    FinDat1.to_excel(writer,yr,na_rep = "NoData", engine='xlsxwriter')
+    
+    Workbook = writer.book
+    format1 = Workbook.add_format({'bg_color':   '#FFC7CE',
+                               'font_color': '#9C0006'})
+    worksheet = writer.sheets[yr]
+    worksheet.conditional_format('A1:J1000', {'type':'text',
+                                              'criteria':'containing',
+                                              'value': 'NoData',
+                                              'format' : format1})
+
 
 writer.save()
+NumProjDat.to_csv("NumUniqPrj.csv",index=False)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
