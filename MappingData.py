@@ -19,7 +19,14 @@ import geopandas as gpd
 import pandasql as ps
 import numpy as np
 import xlsxwriter
-
+from geopandas import GeoDataFrame
+from shapely.geometry import Point, LineString, MultiLineString
+import geopandas as gpd
+import folium
+import pyepsg
+from folium import IFrame
+from folium.plugins import MarkerCluster
+import fiona 
 os.chdir(r'C:\Users\abibeka\OneDrive - Kittelson & Associates, Inc\Documents\HSIP\DataMapping')
 
 # Read the Data
@@ -73,7 +80,8 @@ for yr in Years:
     NumProjDat = pd.concat([temp1, NumProjDat])
     # Get the lookup data for Segment length and AADT
     SegInfoData = pd.read_csv("RMSSEG_State_Roads.csv", 
-                              usecols = ["CTY_CODE","ST_RT_NO","SEG_NO","SEG_LNGTH_FEET","CUR_AADT"])
+                              usecols = ["CTY_CODE","ST_RT_NO","SEG_NO","SEG_LNGTH_FEET","CUR_AADT","X_VALUE_BGN",'Y_VALUE_BGN','X_VALUE_END',
+                                         'Y_VALUE_END'])
     SegInfoData = SegInfoData.rename(columns = {'CTY_CODE':"CountyCode",
                                                 'ST_RT_NO':"SR",
                                                 'SEG_NO':"SegNo",
@@ -98,7 +106,8 @@ for yr in Years:
     
     sqlcode = '''
     select Data1.ProjID, Data1.CountyCode, Data1.SR, Data1.BegSeg, SegInfoData.SegNo, Data1.EndSeg, 
-    SegInfoData.SegLenFt, Data1.BegOff, Data1.EndOff, SegInfoData.CurAADT
+    SegInfoData.SegLenFt, Data1.BegOff, Data1.EndOff, SegInfoData.CurAADT, SegInfoData.X_VALUE_BGN,
+    SegInfoData.Y_VALUE_BGN, SegInfoData.X_VALUE_END, SegInfoData.Y_VALUE_END
     from Data1
     left join SegInfoData on SegInfoData.CountyCode = Data1.CountyCode and SegInfoData.SR = Data1.SR
     and SegInfoData.SegNo between Data1.BegSeg and Data1.EndSeg
@@ -135,13 +144,31 @@ for yr in Years:
     # Only use odd segment when the begin segment is odd and vice versa
     Mask = ((NewDf.BegSeg %2 == 0) & (NewDf.SegNo %2 == 0)) |((NewDf.BegSeg %2 != 0) & (NewDf.SegNo %2 != 0))  
     NewDfClean = NewDf[Mask]
-    NewDfClean = NewDfClean.groupby(['ProjID','CountyCode','SR','BegSeg','BegOff']).agg({'CorSegLen':'sum','CurAADT':'first'}).reset_index()
+    
+    # sum(NewDfClean.Y_VALUE_BGN.isna())
+    # NewDfClean = NewDfClean[NewDfClean.Y_VALUE_BGN.isna()]
+    NewDfClean.loc[:,"BegGeom"] = NewDfClean[["X_VALUE_BGN","Y_VALUE_BGN"]].apply(lambda x: Point((x[0],x[1])),axis=1)
+    NewDfClean.loc[:,"EndGeom"] = NewDfClean[["X_VALUE_END","Y_VALUE_END"]].apply(lambda x: Point((x[0],x[1])),axis=1)
+    NewDfClean.loc[:,"LineSeg"] = NewDfClean[["BegGeom","EndGeom"]].apply(lambda x: LineString(x.tolist()), axis=1)
+    #https://gis.stackexchange.com/questions/202190/turning-geodataframe-of-x-y-coordinates-into-linestrings-using-groupby
+    NewDfClean = NewDfClean.groupby(['ProjID','CountyCode','SR','BegSeg','BegOff']).agg({'CorSegLen':'sum','CurAADT':'first',
+                                                                                         'LineSeg': lambda x:MultiLineString(x.tolist()) }).reset_index()
     NewDfClean.dtypes
     Data1.dtypes
     
     CmList = ['ProjID','CountyCode','SR','BegSeg','BegOff']
     FinDat = pd.merge(Data1, NewDfClean, left_on = CmList, right_on = CmList, how = 'left')
     FinDat1 = FinDat.set_index(['ProjID','County','CountyCode','SR','BegSeg','BegOff','EndSeg','EndOff'])
+    
+    
+    FinDat_Plot = FinDat[~(FinDat.LineSeg.isna())]
+    FinDatGpd = GeoDataFrame(FinDat_Plot,geometry='LineSeg')
+    FinDatGpd.geometry.name
+    FinDatGpd.rename(columns={"LineSeg":"geometry"},inplace=True)
+    FinDatGpd.set_geometry("geometry",inplace=True)
+    FinDatGpd.crs = {'init' :'epsg:4326'}
+    pyepsg.get(FinDatGpd.crs['init'].split(':')[1])
+    FinDatGpd.to_file("ShapeFilesByYear/{}.shp".format(yr))
     
     #Write the output
     #***********************************************************************************************************
@@ -162,7 +189,21 @@ NumProjDat.to_csv("NumUniqPrj.csv",index=False)
 
 
 
+# FinDatJson = FinDatGpd.to_json()
+# m = folium.Map(location=[45.5236, -122.6750],tiles='cartodbpositron')
+# Lines = folium.features.GeoJson(FinDatJson)
+# m.add_child(Lines)
 
+# width, height = 310,110
+# popups, locations = [], []
+# for idx, row in FinDatGpd.iterrows():
+#     Geometry =  Point(row['geometry'].centroid.x, row['geometry'].centroid.y)
+#     locations.append(Geometry)
+    
+    
+# h = folium.FeatureGroup(name="Project Description")
+# h.add_children(MarkerCluster(locations=locations, popups=popups))
+# m.save("index.html")
 
 
 

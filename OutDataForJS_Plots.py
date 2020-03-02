@@ -37,7 +37,6 @@ gdf.loc[:,'COUNTY_NAM'] = gdf.COUNTY_NAM.str.capitalize()
 gdf.loc[:,'COUNTY_NAM'] = gdf.COUNTY_NAM.str.capitalize()
 gdf.loc[:,'COUNTY_NAM']= gdf.loc[:,'COUNTY_NAM'].str.capitalize().str.strip().str.replace('Mckean','McKean')
 gdf.rename(columns = {'COUNTY_NAM': 'CountyNm'},inplace=True)
-df.columns
 
 
 DistrictShapeFile = 'PennDOT-CountyDistrictShp/PennDOT_Engineering_Districts.shp'
@@ -74,11 +73,13 @@ def OutputGeoJson(CrashCat, OutputCatDat,x1, gdf, Tag = "Fatalities"):
     
 def OutputGeoJsonAggreateCat (SHSP_Dat, SHSP_Cat, gdf, Tag = "Fatalities"):
     df = SHSP_Dat[SHSP_Dat.SHSP_Focus_Cat == SHSP_Cat] 
+    df.rename(columns={"2016*":2016},inplace=True)
     YearCols = df.columns.tolist()
     YearCols.remove('CountyNm')
     YearCols.remove('District')
     YearCols.remove('TotalLinearMiles')
     YearCols.remove('TotalDVMT')
+    YearCols.remove('SHSP_Focus_Cat')
     NewYearCols = []
     for i in YearCols:
         df.rename(columns = {i:"Yr-{}".format(i)},inplace=True)
@@ -88,7 +89,7 @@ def OutputGeoJsonAggreateCat (SHSP_Dat, SHSP_Cat, gdf, Tag = "Fatalities"):
     OutDat= gpd.GeoDataFrame(OutDat)
     OutDat["geometry"] = [MultiPolygon([feature]) if type(feature) == Polygon \
         else feature for feature in gdf["geometry"]]
-    OutDat.to_file("Leaflet_Input/{}/SHSP_Cat/{}.geojson".format(Tag, SHSP_Cat), driver='GeoJSON')
+    OutDat.to_file("Leaflet_Input/SHSP/{}/{}.geojson".format(Tag, SHSP_Cat), driver='GeoJSON')
     
     
 for CrashType, WB in zip(['Fatalities','SSI'],["Fatality_Statistics_Processed","Suspected_Serious_Injury_Statistics_Processed"]):
@@ -111,6 +112,8 @@ for CrashType, WB in zip(['Fatalities','SSI'],["Fatality_Statistics_Processed","
     CommonAttributes = AllData[['CountyNm','District','TotalLinearMiles','TotalDVMT']].groupby("CountyNm").first().reset_index()
     
     AllData.drop(columns = ['CrashCategory','District','TotalLinearMiles','TotalDVMT'],inplace=True)
+    AllData.isna().sum()
+    AllData = AllData.applymap(lambda x: 0 if x == "-" else x)
     Dat1  = AllData.groupby(['SHSP_Focus_Cat','CountyNm']).sum().reset_index()
     Dat1.SHSP_Focus_Cat.value_counts()
     Dat1 = Dat1.merge(CommonAttributes, left_on = "CountyNm", right_on = "CountyNm", how = "left" )
