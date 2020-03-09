@@ -32,28 +32,50 @@ os.chdir(r'C:\Users\abibeka\OneDrive - Kittelson & Associates, Inc\Documents\HSI
 # Read the Data
 #************************************************************************************************************
 # Get the Project and Seg data...
-x1 = pd.ExcelFile("2019 HSIP Program Benefit Cost Analysis 5 Year - Kittelson Master - v1.xlsx")
+x1 = pd.ExcelFile("2019 HSIP Program Benefit Cost Analysis 5 Year - Master - v2---Draft.xlsx")
 Years = x1.sheet_names
 writer = pd.ExcelWriter('DataSummary.xlsx')
-Years.remove('Summary (Injuries)'); Years.remove('Summary (Crashes)');Years.remove('Long Narrative');Years.remove('Functional Classifications')
-yr = "2013"
+Years.remove('Functional Classifications'); Years.remove('2016'); Years.remove('Summary (Injuries)');Years.remove('Summary (Crashes)')
+ #Years.remove('Long Narrative')
+yr = "2015"
+yr= "2007-2002"
+Data = x1.parse(yr,skiprows=4)
 NumProjDat = pd.DataFrame()
+Data_AllYear = pd.DataFrame()
+
 for yr in Years:
-    Data = x1.parse(yr,skiprows=4,dtype={"HSIP Proj. ID":str})
+    Data = x1.parse(yr,skiprows=4,dtype={"HSIP Project ID":str})
+    Data.rename(columns={"HSIP Project ID":"HSIP Proj. ID"},inplace=True)
     #Fix 2002-2007
-    if yr == "2002-2007":
+    if yr == "2007-2002":
+        Data = x1.parse(yr,skiprows=3,dtype={"HSIP Project ID":str})
+        Data.rename(columns={"HSIP Project ID":"HSIP Proj. ID"},inplace=True)
         Cols = Data.columns.to_list()
         ColRename = Data.columns[[Cols.index("From"),Cols.index("From")+1,Cols.index("To"), Cols.index("To")+1]]
         ColRenameDict = dict(zip(ColRename, ["Beg Seg","Beg Off","End Seg","End Off"])) 
         Data = Data.rename(columns = ColRenameDict)
         Data = Data.drop(0,axis=0)
         Data["Beg Seg"] =Data["Beg Seg"].astype("int64");Data["Beg Off"] = Data["Beg Off"].astype("int64");Data["End Seg"] = Data["End Seg"].astype("int64");Data["End Off"] = Data["End Off"].astype("int64")
-              
+        Data.loc[Data["Proj. ID"] == "80076\n80077","HSIP Proj. ID"] = "NotDefined"
     Data = Data[['Proj. ID','HSIP Proj. ID','County','SR','Beg Seg','Beg Off', 'End Seg','End Off']]
     Data1 = Data.fillna(method='ffill',axis= 0 )
     Data1.loc[:,"County"] = Data1.loc[:,"County"].str.upper()
-    Data1.loc[:,"HSIP Proj. ID"] = Data1.loc[:,"HSIP Proj. ID"].apply(lambda x: x if len(x.split('.'))==2 else x+".000")
-    if yr == "2002-2007":
+    
+    def CorrectMessyHSIP_Labels(x):
+        Ret1 = ""
+        if len(x.split('.'))==2:
+               Ret1 = x[0:x.find(".")+5]
+               Ret1 = round(float(Ret1),3)
+               Ret1 = str(Ret1)
+        else:
+            Ret1 =x+".000"
+        return(Ret1)
+    
+    Data1.loc[:,"HSIP Proj. ID"] = Data1.loc[:,"HSIP Proj. ID"].apply(lambda x: CorrectMessyHSIP_Labels(x))
+
+    Data1.loc[:,"HSIP Proj. ID"] = Data1.loc[:,"HSIP Proj. ID"].apply(lambda x: x[0:x.find(".")+4] if len(x.split('.'))==2 else x+".000")
+   
+    if yr == "2007-2002":
         Data1.dtypes
         Data1.SR.value_counts()
         Data1.SR = Data1.SR.astype('int64')
@@ -175,6 +197,8 @@ for yr in Years:
     #Write the output
     #***********************************************************************************************************
     FinDat1.to_excel(writer,yr,na_rep = "NoData", engine='xlsxwriter')
+    FinDat1.loc[:,"Year"] = yr
+    Data_AllYear = pd.concat([Data_AllYear,FinDat1])
     
     Workbook = writer.book
     format1 = Workbook.add_format({'bg_color':   '#FFC7CE',
@@ -185,10 +209,24 @@ for yr in Years:
                                               'value': 'NoData',
                                               'format' : format1})
 
-
 writer.save()
 NumProjDat.to_csv("NumUniqPrj.csv",index=False)
 
+
+
+# Write combined data
+writer2 = pd.ExcelWriter('AllYearDataSummary.xlsx')
+Data_AllYear.reset_index(inplace=True) 
+Data_AllYear.to_excel(writer2, "AllYears",na_rep = "NoData", engine='xlsxwriter',index=False)
+Workbook2 = writer2.book
+format2 = Workbook2.add_format({'bg_color':   '#FFC7CE',
+                           'font_color': '#9C0006'})
+worksheet2 = writer2.sheets["AllYears"]
+worksheet2.conditional_format('A1:J1000', {'type':'text',
+                                          'criteria':'containing',
+                                          'value': 'NoData',
+                                          'format' : format2})
+writer2.save()
 
 
 # FinDatJson = FinDatGpd.to_json()
