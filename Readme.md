@@ -14,6 +14,7 @@
 - Find_Missing_Project_list.py: Find the list of missing projects based on 2 tables
 - MappingData.py: Map project ID on GIS
 - MappingData_Just2013.py: Map 2013 data which has HSIP project ID to GIS
+- CheckManualDataCopy.py: Check if I copy pasted the  data correctly.
 
 ## Task 3: Aggregate and Pivot data: Get District in Rows and Crash type in sheet
 - Reshape_Data_District.py: Reshape data by District
