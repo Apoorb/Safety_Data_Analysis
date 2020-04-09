@@ -13,8 +13,12 @@
 ## Task 2: Mapping exercise; Map HSIP project ID to segmentation database. Understand trends
 - Find_Missing_Project_list.py: Find the list of missing projects based on 2 tables
 - MappingData.py: Map project ID on GIS
-- MappingData_Just2013.py: Map 2013 data which has HSIP project ID to GIS
+- MappingData_V1.py: Map data which has HSIP project ID to GIS
+- MappingData_V1 - UpdateProjectInfo.py: Add info for additional projects added by Jesus
 - CheckManualDataCopy.py: Check if I copy pasted the  data correctly.
 
 ## Task 3: Aggregate and Pivot data: Get District in Rows and Crash type in sheet
 - Reshape_Data_District.py: Reshape data by District
+
+## Task 4: Concat datas
+SingleTableDataMapping.py: Get one big table with raw data
