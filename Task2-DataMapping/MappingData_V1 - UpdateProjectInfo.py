@@ -27,19 +27,20 @@ import pyepsg
 from folium import IFrame
 from folium.plugins import MarkerCluster
 import fiona 
-os.chdir(r'C:\Users\abibeka\OneDrive - Kittelson & Associates, Inc\Documents\HSIP\DataMapping')
+os.chdir(r'C:\Users\abibeka\OneDrive - Kittelson & Associates, Inc\Documents\HSIP\DataMapping\April09-DataProcessing\RawData')
 
 # Read the Data
 #************************************************************************************************************
 # Get the Project and Seg data...
-x1 = pd.ExcelFile("2019 HSIP Program Benefit Cost Analysis 5 Year - Master - v2---Draft.xlsx")
+x1 = pd.ExcelFile("2019 HSIP Program Benefit Cost Analysis 5 Year - Master - v4.xlsx")
 Years = x1.sheet_names
-writer = pd.ExcelWriter('DataSummary.xlsx')
+writer = pd.ExcelWriter('../ProcessedData/DataSummary.xlsx')
 Years.remove('Functional Classifications'); Years.remove('2016'); Years.remove('Summary (Injuries)');Years.remove('Summary (Crashes)')
  #Years.remove('Long Narrative')
 yr = "2015"
 yr= "2007-2002"
 Data = x1.parse(yr,skiprows=4)
+list(Data.columns)
 NumProjDat = pd.DataFrame()
 Data_AllYear = pd.DataFrame()
 
@@ -57,7 +58,7 @@ for yr in Years:
         Data = Data.drop(0,axis=0)
         Data["Beg Seg"] =Data["Beg Seg"].astype("int64");Data["Beg Off"] = Data["Beg Off"].astype("int64");Data["End Seg"] = Data["End Seg"].astype("int64");Data["End Off"] = Data["End Off"].astype("int64")
         Data.loc[Data["Proj. ID"] == "80076\n80077","HSIP Proj. ID"] = "NotDefined"
-    Data = Data[['Proj. ID','HSIP Proj. ID','County','SR','Beg Seg','Beg Off', 'End Seg','End Off']]
+    Data = Data[['Proj. ID','HSIP Proj. ID','County','SR','Beg Seg','Beg Off', 'End Seg','End Off','Date Updated']]
     Data1 = Data.fillna(method='ffill',axis= 0 )
     Data1.loc[:,"County"] = Data1.loc[:,"County"].str.upper()
     
@@ -179,20 +180,30 @@ for yr in Years:
     NewDfClean.dtypes
     Data1.dtypes
     
+    # NewDfClean.loc[:,['ProjID','CountyCode','SR','BegSeg','BegOff']] = NewDfClean.loc[:,['ProjID','CountyCode','SR','BegSeg','BegOff']].applymap(lambda x: int(x))
+    # Data1.loc[:,['ProjID','CountyCode','SR','BegSeg','BegOff']] = Data1.loc[:,['ProjID','CountyCode','SR','BegSeg','BegOff']].applymap(lambda x: int(x))
+
     CmList = ['ProjID','CountyCode','SR','BegSeg','BegOff']
     Data1 = Data1.rename(columns ={"HSIP Proj. ID":"HSIP_Proj_ID"})
     FinDat = pd.merge(Data1, NewDfClean, left_on = CmList, right_on = CmList, how = 'left')
     FinDat1 = FinDat.set_index(['ProjID','HSIP_Proj_ID','County','CountyCode','SR','BegSeg','BegOff','EndSeg','EndOff'])
+    maskOldDateUpd = FinDat1["Date Updated"].isna()
+    FinDat1.loc[maskOldDateUpd,"Date Updated"]  = "Old"
+    FinDat1.drop(columns = 'LineSeg',inplace=True)
     
-    
-    FinDat_Plot = FinDat[~(FinDat.LineSeg.isna())]
+    FinDat_Plot = FinDat[~(FinDat.LineSeg.isna())].copy()
     FinDatGpd = GeoDataFrame(FinDat_Plot,geometry='LineSeg')
     FinDatGpd.geometry.name
+    FinDatGpd.drop(columns = "Date Updated",inplace=True)
     FinDatGpd.rename(columns={"LineSeg":"geometry"},inplace=True)
     FinDatGpd.set_geometry("geometry",inplace=True)
     FinDatGpd.crs = {'init' :'epsg:4326'}
     pyepsg.get(FinDatGpd.crs['init'].split(':')[1])
-    FinDatGpd.to_file("ShapeFilesByYear2/{}.shp".format(yr))
+    try: 
+        os.makedirs("../ProcessedData") 
+        os.makedirs("../ProcessedData/ShapeFilesByYear2") 
+    except: "Failed to create dir"
+    FinDatGpd.to_file("../ProcessedData/ShapeFilesByYear2/{}.shp".format(yr))
     
     #Write the output
     #***********************************************************************************************************
@@ -210,12 +221,12 @@ for yr in Years:
                                               'format' : format1})
 
 writer.save()
-NumProjDat.to_csv("NumUniqPrj.csv",index=False)
+NumProjDat.to_csv("../ProcessedData/NumUniqPrj.csv",index=False)
 
 
 
 # Write combined data
-writer2 = pd.ExcelWriter('AllYearDataSummary.xlsx')
+writer2 = pd.ExcelWriter('../ProcessedData/AllYearDataSummary.xlsx')
 Data_AllYear.reset_index(inplace=True) 
 Data_AllYear.to_excel(writer2, "AllYears",na_rep = "NoData", engine='xlsxwriter',index=False)
 Workbook2 = writer2.book
