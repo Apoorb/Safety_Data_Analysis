@@ -31,23 +31,31 @@ from folium.plugins import MarkerCluster
 import fiona 
 from datetime import datetime
 
-os.chdir(r'C:\Users\abibeka\OneDrive - Kittelson & Associates, Inc\Documents\HSIP\March27-DataProcessing\RawData')
+os.chdir(r'C:\Users\abibeka\OneDrive - Kittelson & Associates, Inc\Documents\HSIP\DataMapping\April09-DataProcessing\RawData')
 
 
 # Read the Data
 #************************************************************************************************************
 # Get the Project and Seg data...
-x1 = pd.ExcelFile("2019 HSIP Program Benefit Cost Analysis 5 Year - Master - v3.xlsx")
+x1 = pd.ExcelFile("2019 HSIP Program Benefit Cost Analysis 5 Year - Master - v8.2 Prep.xlsx")
 x1.sheet_names
 Years = x1.sheet_names
 writer = pd.ExcelWriter('DataSummary.xlsx')
 Years.remove('Functional Classifications'); Years.remove('2016'); Years.remove('Summary (Injuries)');Years.remove('Summary (Crashes)')
- #Years.remove('Long Narrative')
-yr = "2008"
-yr= "2007-2002"
-Data = x1.parse(yr,skiprows=3)
+Years.remove('Year_AnalysisPeriod'); Years.remove('RemovedProjects_Changes'); Years.remove('Project_ImpType_Planning_P_Map')
+Years.remove('CostofCrashes')try:
+    Years.remove('Year_AnalysisPeriod'); Years.remove('RemovedProjects_Changes'); 
+except: print('')
+#Years.remove('Long Narrative')
+yr = "2014"
+# yr= "2007-2002"
+Data = x1.parse(yr,skiprows=4,dtype={"HSIP Project ID":str})
+list(Data.columns)
 Data.rename(columns = {"Project Title":"Title","Constr. Completion Date":"Constr. Comp. Date",
                        "Notice to Proceed Date":"NTP or Let Date"},inplace=True)
+
+
+
 KeepCols = ['Proj. ID',
  'HSIP Project ID',
  'NTP or Let Date',
@@ -70,7 +78,10 @@ KeepCols = ['Proj. ID',
  'End Seg',
  'End Off',
  'Length (ft.)',
- 'AADT']
+ 'AADT',
+ 'Method for Site Selection',
+ 'Date Updated'
+ ]
 
 Data = Data[KeepCols]
 NumProjDat = pd.DataFrame()
@@ -100,18 +111,14 @@ PLANNING_PDat.rename(columns = {'NumDrivers':'NumDrivers_PlanningP',"DVMT":'DVMT
 
 for yr in Years:
     #Read the DAta
-    Data = x1.parse(yr,skiprows=4,dtype={"HSIP Project ID":str})
+    Data = x1.parse(yr,skiprows=4,dtype={"HSIP Project ID":str},parse_cols ="A:DI")
+    Data = Data[~Data['Beg Seg'].isna()]
     Data.rename(columns = {"Project Title":"Title","Constr. Completion Date":"Constr. Comp. Date",
                        "Notice to Proceed Date":"NTP or Let Date",
                        "HSIP Project ID_GTE":"HSIP Project ID"
                        },inplace=True)
     #Fix 2002-2007
-    if yr == "2007-2002":
-        Data = x1.parse(yr,skiprows=3,dtype={"HSIP Project ID":str})
-        Data.rename(columns = {"Project Title":"Title","Constr. Completion Date":"Constr. Comp. Date",
-                       "Notice to Proceed Date":"NTP or Let Date"},inplace=True)
-        Data = Data.drop(0,axis=0)
-        Data["Beg Seg"] =Data["Beg Seg"].astype("int64");Data["Beg Off"] = Data["Beg Off"].astype("int64");Data["End Seg"] = Data["End Seg"].astype("int64");Data["End Off"] = Data["End Off"].astype("int64")
+    if yr in ["2007-2002","2004-2007"]:
         Data.loc[Data["Proj. ID"] == "80076\n80077","HSIP Project ID"] = "NotDefined"
     Data = Data[KeepCols]
     Data1 = Data.copy()
@@ -132,7 +139,7 @@ for yr in Years:
     Data1.loc[:,"HSIP Project ID"] = Data1.loc[:,"HSIP Project ID"].apply(lambda x: CorrectMessyHSIP_Labels(x))
     Data1.loc[:,"HSIP Project ID"] = Data1.loc[:,"HSIP Project ID"].apply(lambda x: x[0:x.find(".")+4] if len(x.split('.'))==2 else x+".000")
    
-    if yr == "2007-2002":
+    if yr in ["2007-2002","2004-2007"]:
         Data1.dtypes
         Data1.SR.value_counts()
         Data1.SR = Data1.SR.astype('int64')
@@ -149,9 +156,10 @@ for yr in Years:
     Data1.SR =Data1.SR.astype(int)
     #Impute Missing Length
     Mask = (Data1.loc[:,"Length (ft.)"]=="NoData") & (Data1['Beg Seg'] ==Data1['End Seg'])
-    Data1.loc[Mask,'Length (ft.)'] = Data1.loc[Mask, 'Beg Off'] - Data1.loc[Mask, 'End Off']
+    Data1.loc[Mask,'Length (ft.)'] = Data1.loc[Mask, 'End Off']-Data1.loc[Mask, 'Beg Off']
     #Need to make some assumption for 2 rows 
     Error = pd.concat([Error,Data1.loc[Data1.loc[:,"Length (ft.)"]=="NoData"]])
+    Error.loc[:,'ImputedLength'] = Error['End Off']+ 500
     Data1.loc[Data1.loc[:,"Length (ft.)"]=="NoData", "Length (ft.)"] = Data1.loc[Data1.loc[:,"Length (ft.)"]=="NoData", 'End Off'] + 500 # Assume Beg Seg is 500 ft.
     
     def GetLenPerRow(SmallDf):
@@ -171,8 +179,10 @@ for yr in Years:
     Data1.loc[Data1['Tp_Cd']=="EQUAL","FracLen"] = np.NaN
     Data1.drop(columns = ["Temp","Temp2","Tp_Cd"],inplace=True)
     Data1.loc[:,"Year"] = yr
+    maskOldDateUpd = Data1["Date Updated"].isna()
+    Data1.loc[maskOldDateUpd,"Date Updated"]  = "Old"
     Data_AllYear = pd.concat([Data_AllYear,Data1])
-
+    
 
 # Add District data and Functional Class
 Data_AllYear = Data_AllYear.merge(DistrictDat,on="DISTRICT_N", how='left')
@@ -181,6 +191,21 @@ Data_AllYear.loc[Data_AllYear['Functional Class'].isna(),'Functional Class'] = -
 Data_AllYear.loc[:,'Functional Class'] = Data_AllYear['Functional Class'].astype(int)
 FunctionalClassDat.dtypes
 Data_AllYear = Data_AllYear.merge(FunctionalClassDat,left_on= 'Functional Class', right_on = "PennDOT FC",how="left")
+maskOldData = Data_AllYear["Date Updated"]  == "Old"
+NewData = Data_AllYear[~maskOldData]
+
+Data_AllYear_Sort = pd.concat([Data_AllYear[maskOldData], Data_AllYear[~maskOldData]])
+Data_AllYear_Sort.loc[Data_AllYear_Sort["Beg Off"]==-999, "Length (ft.)"] = "NoData"
+#Reorder Columns 
+KeepCols1 = KeepCols.copy()
+UpdatedColNms = list(Data_AllYear_Sort.columns)
+UpdatedColNms.remove('Method for Site Selection')
+UpdatedColNms.append('Method for Site Selection')
+UpdatedColNms.remove('Date Updated')
+UpdatedColNms.append('Date Updated')
+Data_AllYear_Sort = Data_AllYear_Sort.loc[:,UpdatedColNms]
+list(Data_AllYear_Sort.columns)
+
 # Issue = Data_AllYear[Data_AllYear.loc[:,'Functional Class'].isna()]
 
 # Mask = (Data_AllYear.loc[:,"Length (ft.)"]=="NoData") & (Data_AllYear['Beg Seg'] ==Data_AllYear['End Seg'])
@@ -220,7 +245,7 @@ d4 = now.strftime("%b-%d-%Y %H_%M")
 OutFi = "../SingleTable_BC_AADT_Len_Data_{}.xlsx".format(d4)
 
 writer = pd.ExcelWriter(OutFi)
-Data_AllYear.to_excel(writer,"AllYear",index=False)
+Data_AllYear_Sort.to_excel(writer,"AllYear",index=False)
 DataProjSum.to_excel(writer,"Project_by_Year",index=False)
 DataHSIPProjSum.to_excel(writer,"HSIP_Project_by_Year",index=False)
 DistrictDat.to_excel(writer,"DistrictDat",index=False)
