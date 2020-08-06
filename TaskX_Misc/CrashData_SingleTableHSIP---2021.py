@@ -31,18 +31,16 @@ from folium.plugins import MarkerCluster
 import fiona 
 from datetime import datetime
 
-os.chdir(r'C:\Users\abibeka\OneDrive - Kittelson & Associates, Inc\Documents\HSIP\DataMapping\April09-DataProcessing\RawData')
+os.chdir(r'C:\Users\abibeka\OneDrive - Kittelson & Associates, Inc\Documents\HSIP\DataMapping\Appendix2016')
 
 # Read the Data
 #************************************************************************************************************
 # Get the Project and Seg data...
-x1 = pd.ExcelFile("Task 2.7 Project Analysis_2020-04-30 - Copy.xlsx")
-x1.sheet_names
-Years = x1.sheet_names
-writer = pd.ExcelWriter('DataSummary.xlsx')
-Years.remove('Sheet1')
-yr= "2021"
-Data = x1.parse(yr,skiprows=3)
+x1 = pd.ExcelFile("2016 Appendix.xlsx")
+Years = ["2016 Projects"]
+writer = pd.ExcelWriter('DataSummary2016.xlsx')
+yr =Years[0]
+Data = x1.parse(yr,skiprows=4)
 list(Data.columns)
 Data.rename(columns = {"Project Title":"Title","Constr. Completion Date":"Constr. Comp. Date",
                        "Notice to Proceed Date":"NTP or Let Date","FY2021 Obligation":"Project Cost"},inplace=True)
@@ -51,14 +49,13 @@ Data.rename(columns = {"Project Title":"Title","Constr. Completion Date":"Constr
 
 KeepCols = ['Proj. ID',
  'HSIP Project ID',
- 'Est Let Date',
- 'Title', 'ADT',
+ 'NTP or Let Date',
+ 'Title',
  'PennDOT Description',
  'Functional Class',
  'Cost Distribution',
  'Improvement Category',
  'Improvement Type',
- 'SHSP Emphasis Area',
  'Project Cost',
  'County',
  'SR',
@@ -115,7 +112,7 @@ Data_AllYear = pd.DataFrame()
 Error = pd.DataFrame()
 
 
-x2 = pd.ExcelFile("2019 HSIP Program Benefit Cost Analysis 5 Year - Master - v8.2 Prep.xlsx")
+x2 = pd.ExcelFile("../April09-DataProcessing/RawData/2019 HSIP Program Benefit Cost Analysis 5 Year - Master - v8.2 Prep.xlsx")
 #Crash Cost Data
 # CrashCost = x2.parse('CostofCrashes')
 #Get Functional class data
@@ -138,10 +135,10 @@ sum(DistrictDat.DVMT_District)
 PLANNING_PDat = TempDat.groupby('PLANNING_P')[['NumDrivers','DVMT']].sum().reset_index()
 PLANNING_PDat.rename(columns = {'NumDrivers':'NumDrivers_PlanningP',"DVMT":'DVMT_PlanningP'},inplace=True)
 
-yr = "2021"
+yr = '2016 Projects'
 for yr in Years:
     #Read the DAta
-    Data = x1.parse(yr,skiprows=3,dtype={"HSIP Project ID":str},parse_cols ="A:DI")
+    Data = x1.parse(yr,skiprows=4,dtype={"HSIP Project ID":str},parse_cols ="A:DI")
     Data = Data[~Data['Beg Seg'].isna()]
     Data.rename(columns = {"Project Title":"Title","Constr. Completion Date":"Constr. Comp. Date",
                        "Notice to Proceed Date":"NTP or Let Date",
@@ -190,6 +187,7 @@ for yr in Years:
     #Need to make some assumption for 2 rows ############################################################################
     Error = pd.concat([Error,Data1.loc[Data1.loc[:,"Length (ft.)"]=="NoData"]])
     Data1.loc[Data1.loc[:,"Beg Seg"]==-999, "Length (ft.)"] = -9999
+    Data1.loc[Data1.loc[:,"Length (ft.)"]=="NoData", "Length (ft.)"] = -9999
     #Get Cost ############################################################################################################
     def GetLenPerRow(SmallDf):
         TotalLen = sum(SmallDf)
@@ -228,8 +226,9 @@ Data_AllYear1.loc[:,'ProjectSNo'] = Data_AllYear1.groupby(['Proj. ID']).cumcount
 Data_AllYear1.loc[:,'HsipProjectSNo'] = Data_AllYear1.groupby(['Proj. ID',"HSIP Project ID"])['Proj. ID'].cumcount()+1
     
 Data_AllYear1.loc[Data_AllYear1.ProjectSNo!=1,'Project Cost'] = np.NaN
+Data_AllYear1.loc[Data_AllYear1.Year=="2016 Projects","Year"] = "2016"
 
-Year_AnalysisPeriod = x1.parse('Sheet1',skiprows=0)
+Year_AnalysisPeriod = x2.parse('Year_AnalysisPeriod',skiprows=0)
 Year_AnalysisPeriod.Year =Year_AnalysisPeriod.Year.astype(str)
 Data_AllYear1 = Data_AllYear1.merge(Year_AnalysisPeriod, on='Year',how='left')
 # Add District data and Functional Class
@@ -253,7 +252,7 @@ Data_AllYear1.loc[:,'DISTRICT_N'] = Data_AllYear1.loc[:,'DISTRICT_N'].astype(str
 #     + (Data_AllYear1.Before_SSI-Data_AllYear1.After_SSI)*Data_AllYear1.SSICost
 
 Data_AllYear1.loc[:,'Before_FatalSSI'] = Data_AllYear1.Before_Fatal + Data_AllYear1.Before_SSI
-# Data_AllYear1.loc[:,'After_FatalSSI'] = Data_AllYear1.After_Fatal + Data_AllYear1.After_SSI
+Data_AllYear1.loc[:,'After_FatalSSI'] = Data_AllYear1.After_Fatal + Data_AllYear1.After_SSI
 # Data_AllYear1.loc[:,"DiffBeforeAfter_FatalSSI"] = Data_AllYear1.loc[:,'Before_FatalSSI']-Data_AllYear1.loc[:,'After_FatalSSI'] 
 # Data_AllYear1.drop(columns=['FatalCost',"SSICost"],inplace=True)
 
@@ -261,13 +260,11 @@ MinFunctionalClassHSIP = Data_AllYear1.groupby(['Year','Proj. ID','HSIP Project 
 
 Data_AllYear1= Data_AllYear1.sort_values(['Year','Proj. ID','ProjectSNo','HSIP Project ID','HsipProjectSNo'])
 Data_AllYear1 = Data_AllYear1.set_index(['Year','Proj. ID','ProjectSNo','HSIP Project ID','HsipProjectSNo'])
-Data_AllYear1.rename(columns = {"Project Cost":"FY2021 Obligation"
-                       },inplace=True)
     #Fix 2002-2007
 
 now = datetime.now()
 d4 = now.strftime("%b-%d-%Y %H_%M")
-OutFi = "../ProcessedData/AllRowsCrashData-2021{}.xlsx".format(d4)
+OutFi = "AllRowsCrashData-2016{}.xlsx".format(d4)
 writer = pd.ExcelWriter(OutFi)
 Data_AllYear1.to_excel(writer,"MasterTableHSIP",index=True,merge_cells=False)
 MinFunctionalClassHSIP.to_excel(writer,"MinFunctionalClassHSIP",index=True,merge_cells=False)

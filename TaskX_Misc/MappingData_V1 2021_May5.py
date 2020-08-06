@@ -27,22 +27,22 @@ import pyepsg
 from folium import IFrame
 from folium.plugins import MarkerCluster
 import fiona 
-os.chdir(r'C:\Users\abibeka\OneDrive - Kittelson & Associates, Inc\Documents\HSIP\DataMapping\April09-DataProcessing\RawData')
+os.chdir(r'C:\Users\abibeka\OneDrive - Kittelson & Associates, Inc\Documents\HSIP\DataMapping\Appendix2016')
 
 # Read the Data
 #************************************************************************************************************
 # Get the Project and Seg data...
-x1 = pd.ExcelFile("Task 2.7 Project Analysis_2020-04-30.xlsx")
-Years = x1.sheet_names
-writer = pd.ExcelWriter('../ProcessedData/DataSummary2021.xlsx')
-yr = "FY2021 Projects"
+x1 = pd.ExcelFile("2016 Appendix.xlsx")
+Years = ["2016 Projects"]
+writer = pd.ExcelWriter('DataSummary2016.xlsx')
+yr =Years[0]
 Data = x1.parse(yr,skiprows=4)
 list(Data.columns)
 NumProjDat = pd.DataFrame()
 Data_AllYear = pd.DataFrame()
 
 for yr in Years:
-    Data = x1.parse(yr,skiprows=3,dtype={"HSIP Project ID":str})
+    Data = x1.parse(yr,skiprows=4,dtype={"HSIP Project ID":str})
     Data.rename(columns={"HSIP Project ID":"HSIP Proj. ID"},inplace=True)
     Data = Data[['Proj. ID','HSIP Proj. ID','County','SR','Beg Seg','Beg Off', 'End Seg','End Off']]
     Data1 = Data.fillna(method='ffill',axis= 0 )

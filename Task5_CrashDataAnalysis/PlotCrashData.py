@@ -215,7 +215,11 @@ def GroupData(data1,data1_TotalCrash,CostCrash, Cat):
 
 def HeatmapByCat(data,cbarLab,Ylab,SaveFig,dim=[10,10],cbar_ticks="",color_map=""):
     sns.set(font_scale=1.4,style="ticks")
-    dims = (10,14)
+    
+    if Ylab in ["Cost Distribution",'Urban-Rural','Method for Site Selection']:
+        dims= (10,6.3)
+    else:
+        dims = (10,14)
     fig3, ax3 = plt.subplots(figsize=dims)
     if cbar_ticks=="":
         sns.heatmap(data, ax=ax3,cmap='viridis_r',annot=True,linewidth=.5,fmt='g',
@@ -235,7 +239,7 @@ def HeatmapByCat(data,cbarLab,Ylab,SaveFig,dim=[10,10],cbar_ticks="",color_map="
         cbar.set_ticklabels(["< 0", 1,4,"> 7"])
     ax3.set(ylabel =Ylab )
     plt.yticks(rotation=45)
-    plt.xticks(rotation=90)
+    plt.xticks(rotation=30,ha="right")
     fig3.savefig(SaveFig,bbox_inches="tight")
     plt.close()
     return(fig3)
