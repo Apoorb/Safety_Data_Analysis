@@ -20,7 +20,7 @@
 ## Task 3: Aggregate and Pivot data: Get District in Rows and Crash type in sheet
 - Reshape_Data_District.py: Reshape data by District
 
-## Task 4: Concat datas
+## Task 4: Concat data
 SingleTableDataMapping.py: Get one big table with raw data
 
 ## Task5: Crash Data Analysis
